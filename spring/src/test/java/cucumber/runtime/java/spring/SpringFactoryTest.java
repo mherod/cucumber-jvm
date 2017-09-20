@@ -7,6 +7,8 @@ import cucumber.runtime.java.spring.commonglue.AutowiresPlatformTransactionManag
 import cucumber.runtime.java.spring.commonglue.AutowiresThirdStepDef;
 import cucumber.runtime.java.spring.commonglue.OneStepDef;
 import cucumber.runtime.java.spring.commonglue.ThirdStepDef;
+import cucumber.runtime.java.spring.componentannotation.WithComponentAnnotation;
+import cucumber.runtime.java.spring.componentannotation.WithControllerAnnotation;
 import cucumber.runtime.java.spring.metaconfig.general.BellyMetaStepdefs;
 import cucumber.runtime.java.spring.contextconfig.BellyStepdefs;
 import cucumber.runtime.java.spring.contextconfig.WithSpringAnnotations;
@@ -246,5 +248,19 @@ public class SpringFactoryTest {
         final ObjectFactory factory = new SpringFactory();
         factory.addClass(WithContextHierarchyAnnotation.class);
         factory.addClass(WithDifferentContextHierarchyAnnotation.class);
+    }
+
+    @Test(expected=CucumberException.class)
+    public void shouldFailIfClassWithSpringComponentAnnotationsIsFound() {
+        final ObjectFactory factory = new SpringFactory();
+        factory.addClass(WithComponentAnnotation.class);
+
+    }
+
+    @Test(expected=CucumberException.class)
+    public void shouldFailIfClassWithAnnotationAnnotatedWithSpringComponentAnnotationsIsFound() {
+        final ObjectFactory factory = new SpringFactory();
+        factory.addClass(WithControllerAnnotation.class);
+
     }
 }

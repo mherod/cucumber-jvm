@@ -1,5 +1,6 @@
 package cucumber.runtime.java.spring;
 
+import static java.util.Arrays.asList;
 import static org.springframework.test.context.FixBootstrapUtils.createBootstrapContext;
 import static org.springframework.test.context.FixBootstrapUtils.resolveTestContextBootstrapper;
 
@@ -13,6 +14,10 @@ import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.context.support.GenericApplicationContext;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Controller;
+import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Service;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.ContextHierarchy;
 import org.springframework.test.context.TestContextManager;
@@ -20,6 +25,7 @@ import org.springframework.test.context.TestContextManager;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 
 /**
  * Spring based implementation of ObjectFactory.
@@ -27,20 +33,25 @@ import java.util.HashSet;
  * <p>
  * <ul>
  * <li>It uses TestContextManager to manage the spring context.
- * Configuration via: @ContextConfiguration or @ContextHierarcy
- * At least on step definition class needs to have a @ContextConfiguration or
- * @ContextHierarchy annotation. If more that one step definition class has such
+ * Configuration via: @{@link ContextConfiguration} or @{@link ContextHierarchy}
+ * At least one step definition class needs to have a @ContextConfiguration
+ * or @ContextHierarchy annotation. If more that one step definition class has such
  * an annotation, the annotations must be equal on the different step definition
- * classes. If no step definition class with @ContextConfiguration or
- * @ContextHierarcy is found, it will try to load cucumber.xml from the classpath.
+ * classes. If no step definition class with @ContextConfiguration or @ContextHierarchy
+ * is found, it will try to load cucumber.xml from the classpath.
  * </li>
  * <li>The step definitions class with @ContextConfiguration or @ContextHierarchy
- * annotation, may also have a @WebAppConfiguration or @DirtiesContext annotation.
+ * annotation, may also have a @{@link org.springframework.test.context.web.WebAppConfiguration}
+ * or @{@link org.springframework.test.annotation.DirtiesContext} annotation.
  * </li>
  * <li>The step definitions added to the TestContextManagers context and
  * is reloaded for each scenario.</li>
+ * <li>Step definition classes should not be annotated with @{@link Component} or
+ * other annotations that  marks it as eligible for detection by classpath scanning.</li>
+ * <li>When a step definition class is annotated with @Component, @{@link Controller}, @{@link Repository}
+ * or @{@link Service} an exception will be thrown.</li>
+ * </li>
  * </ul>
- * </p>
  * <p/>
  * <p>
  * Application beans are accessible from the step definitions using autowiring
@@ -48,6 +59,8 @@ import java.util.HashSet;
  * </p>
  */
 public class SpringFactory implements ObjectFactory {
+
+    private static final List<Class<? extends Annotation>> componentStereoTypes = asList(Component.class, Controller.class, Repository.class, Service.class);
 
     private ConfigurableListableBeanFactory beanFactory;
     private CucumberTestContextManager testContextManager;
@@ -61,6 +74,7 @@ public class SpringFactory implements ObjectFactory {
     @Override
     public boolean addClass(final Class<?> stepClass) {
         if (!stepClasses.contains(stepClass)) {
+            checkNoComponentAnnotations(stepClass);
             if (dependsOnSpringContext(stepClass)) {
                 if (stepClassWithSpringContext == null) {
                     stepClassWithSpringContext = stepClass;
@@ -72,6 +86,20 @@ public class SpringFactory implements ObjectFactory {
         }
         return true;
     }
+
+    private void checkNoComponentAnnotations(Class<?> type) {
+        for (Class<? extends Annotation> stereoType : componentStereoTypes) {
+            if (type.isAnnotationPresent(stereoType)) {
+                throw new CucumberException(String.format("" +
+                        "Glue class %1$s was annotated with @%2$s; marking it as a candidate for auto-detection by " +
+                        "Spring. Glue classes are detected and registered by Cucumber. Auto-detection of glue classes by " +
+                        "spring may lead to duplicate bean definitions. Please remove the @%2$s annotation",
+                    type.getName(),
+                    stereoType.getSimpleName()));
+            }
+        }
+    }
+
 
     private void checkAnnotationsEqual(Class<?> stepClassWithSpringContext, Class<?> stepClass) {
         Annotation[] annotations1 = stepClassWithSpringContext.getAnnotations();
